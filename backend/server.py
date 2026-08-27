@@ -24,6 +24,8 @@ from starlette.middleware.cors import CORSMiddleware
 from db import (sb, now_iso, parse_dt, client_ip, is_unique_violation, ensure_bucket,
                 upload_build, download_build, delete_build, db_ready)
 from emails import send_email, twofa_code_email, purchase_email
+import discord_integration as discord
+from fastapi.responses import RedirectResponse
 
 logger = logging.getLogger("bratclient")
 logging.basicConfig(level=logging.INFO)
@@ -471,10 +473,27 @@ async def lifespan(app: FastAPI):
     if await db_ready():
         await ensure_bucket()
         await seed()
+        if discord.is_configured():
+            asyncio.create_task(discord_role_loop())
+            logger.info("Discord role sync loop started")
         logger.info("BratClient backend ready (Supabase)")
     else:
         logger.error("SUPABASE SCHEMA MISSING — run backend/supabase_schema.sql")
     yield
+
+
+async def discord_role_loop():
+    """Co 30 min: nadaje rolę aktywnym licencjom, zabiera wygasłym."""
+    while True:
+        try:
+            await asyncio.sleep(1800)
+            client = await sb()
+            linked = await rows(client.table("users").select("*").not_.is_("discord_id", "null"))
+            for user in linked:
+                await sync_discord_role(user)
+        except Exception as e:
+            logger.warning("discord_role_loop error: %s", e)
+
 
 
 app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -649,10 +668,109 @@ async def change_password(body: PasswordIn, request: Request, u=Depends(current_
 
 @api.post("/users/me/discord/toggle")
 async def toggle_discord(u=Depends(current_user)):
+    # Zachowane dla kompatybilności: pozwala tylko ROZŁĄCZYĆ Discord.
+    # Łączenie idzie przez prawdziwy OAuth (/discord/connect).
     client = await sb()
-    new = not u.get("discord_connected", False)
-    await client.table("users").update({"discord_connected": new}).eq("id", u["id"]).execute()
-    return {"discord_connected": new}
+    if u.get("discord_id"):
+        await client.table("users").update({
+            "discord_connected": False, "discord_id": None, "discord_username": None,
+            "discord_role_active": False}).eq("id", u["id"]).execute()
+        if discord.is_configured():
+            try:
+                await discord.remove_role(u["discord_id"])
+            except Exception as e:
+                logger.warning("discord role remove failed: %s", e)
+    return {"discord_connected": False}
+
+
+# ---------------------------------------------------------------- Discord OAuth
+
+async def sync_discord_role(user: dict) -> bool:
+    """Nadaje rolę gdy licencja aktywna, zabiera gdy brak. Zwraca aktualny stan roli."""
+    if not discord.is_configured() or not user.get("discord_id"):
+        return False
+    client = await sb()
+    lic = await active_license(user["id"])
+    want = bool(lic)
+    has = bool(user.get("discord_role_active"))
+    try:
+        if want and not has:
+            await discord.add_role(user["discord_id"])
+        elif not want and has:
+            await discord.remove_role(user["discord_id"])
+    except Exception as e:
+        logger.warning("sync_discord_role failed: %s", e)
+        return has
+    if want != has:
+        await client.table("users").update({"discord_role_active": want}).eq("id", user["id"]).execute()
+    return want
+
+
+@api.get("/discord/connect")
+async def discord_connect(u=Depends(current_user)):
+    if not discord.is_configured():
+        raise HTTPException(503, "Discord integration not configured")
+    # state = podpisany JWT z id usera (chroni przed CSRF, wiąże callback z kontem)
+    state = jwt.encode({"sub": u["id"], "type": "discord_state",
+                        "exp": datetime.now(timezone.utc) + timedelta(minutes=10)},
+                       os.environ["JWT_SECRET"], algorithm=JWT_ALG)
+    return {"url": discord.oauth_url(state)}
+
+
+@api.get("/discord/callback")
+async def discord_callback(code: str | None = None, state: str | None = None):
+    front = (os.environ.get("PUBLIC_APP_URL", "") or "").rstrip("/")
+    dest = f"{front}/panel"
+    if not code or not state:
+        return RedirectResponse(f"{dest}?discord=error")
+    try:
+        payload = jwt.decode(state, os.environ["JWT_SECRET"], algorithms=[JWT_ALG])
+        if payload.get("type") != "discord_state":
+            raise ValueError("bad state")
+        user_id = payload["sub"]
+    except Exception:
+        return RedirectResponse(f"{dest}?discord=error")
+
+    client = await sb()
+    u = await get_user_by_id(user_id)
+    if not u:
+        return RedirectResponse(f"{dest}?discord=error")
+    try:
+        tok = await discord.exchange_code(code)
+        access = tok["access_token"]
+        d_user = await discord.get_discord_user(access)
+        discord_id = d_user["id"]
+        dname = d_user.get("username") or ""
+        # jedno konto Discord = jedno konto BratClient
+        taken = await one(client.table("users").select("id").eq("discord_id", discord_id))
+        if taken and taken["id"] != user_id:
+            return RedirectResponse(f"{dest}?discord=taken")
+        await discord.add_member_to_guild(discord_id, access)
+        await client.table("users").update({
+            "discord_id": discord_id, "discord_username": dname,
+            "discord_connected": True, "discord_linked_at": now_iso()}).eq("id", user_id).execute()
+        u["discord_id"] = discord_id
+        u["discord_role_active"] = False
+        await sync_discord_role(u)
+        return RedirectResponse(f"{dest}?discord=connected")
+    except Exception as e:
+        logger.error("discord callback failed: %s", e)
+        return RedirectResponse(f"{dest}?discord=error")
+
+
+@api.post("/discord/disconnect")
+async def discord_disconnect(u=Depends(current_user)):
+    client = await sb()
+    if u.get("discord_id") and discord.is_configured():
+        try:
+            await discord.remove_role(u["discord_id"])
+        except Exception as e:
+            logger.warning("discord disconnect role remove failed: %s", e)
+    await client.table("users").update({
+        "discord_connected": False, "discord_id": None, "discord_username": None,
+        "discord_role_active": False}).eq("id", u["id"]).execute()
+    return {"discord_connected": False}
+
 
 
 @api.post("/users/me/2fa/request")
@@ -728,6 +846,8 @@ async def purchase(body: PurchaseIn, request: Request, u=Depends(current_user)):
     order = await create_order(u, "plan", body.plan, f"Licencja {label}", amount,
                                discount, coupon, ref_id=lic["id"])
     asyncio.create_task(notify_purchase(u, order, lic["key"], lic.get("expires_at")))
+    if u.get("discord_id"):
+        asyncio.create_task(sync_discord_role(u))
     return {"license": lic, "order": order}
 
 

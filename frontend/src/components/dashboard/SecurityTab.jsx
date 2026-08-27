@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { ShieldCheck, Mail, X } from "lucide-react";
@@ -12,11 +12,23 @@ const inputCls = "w-full rounded-xl border border-white/10 bg-black px-4 py-3 fo
 export default function SecurityTab() {
   const { t } = useLang();
   const { user, setUser } = useAuth();
+  const { refreshUser } = useAuth();
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [challenge, setChallenge] = useState(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // Powrót z autoryzacji Discord (?discord=connected|taken|error)
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("discord");
+    if (!p) return;
+    if (p === "connected") { toast.success(t("dash.security.connected")); refreshUser?.(); }
+    else if (p === "taken") toast.error("To konto Discord jest już połączone z innym kontem.");
+    else if (p === "error") toast.error("Nie udało się połączyć Discorda. Spróbuj ponownie.");
+    window.history.replaceState({}, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const changePw = async () => {
     try {
@@ -26,13 +38,22 @@ export default function SecurityTab() {
     } catch (e) { toast.error(errMsg(e)); }
   };
 
-  const toggleDiscord = async () => {
+  const connectDiscord = async () => {
     try {
-      const { data } = await api.post("/users/me/discord/toggle");
-      setUser({ ...user, ...data });
-      toast.success(data.discord_connected ? t("dash.security.connected") : t("dash.security.disconnected"));
+      const { data } = await api.get("/discord/connect");
+      window.location.href = data.url; // przekierowanie do autoryzacji Discord
     } catch (e) { toast.error(errMsg(e)); }
   };
+
+  const disconnectDiscord = async () => {
+    try {
+      await api.post("/discord/disconnect");
+      setUser({ ...user, discord_connected: false, discord_id: null, discord_username: null });
+      toast.success(t("dash.security.disconnected"));
+    } catch (e) { toast.error(errMsg(e)); }
+  };
+
+  const toggleDiscord = () => (user.discord_connected ? disconnectDiscord() : connectDiscord());
 
   const requestCode = async () => {
     setBusy(true);
