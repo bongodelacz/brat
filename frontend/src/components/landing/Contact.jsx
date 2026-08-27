@@ -25,7 +25,7 @@ export default function Contact() {
             </div>
             <div className="flex flex-col gap-3">
               <motion.a whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                href="https://discord.gg/bratclient" target="_blank" rel="noreferrer" data-testid="contact-discord-btn"
+                href="https://discord.gg/brat" target="_blank" rel="noreferrer" data-testid="contact-discord-btn"
                 className="flex items-center justify-between rounded-2xl bg-white px-6 py-5 text-black transition-colors hover:bg-white/80">
                 <span className="flex items-center gap-3 font-mono2 text-sm font-bold uppercase tracking-widest">
                   <MessageCircle size={18} /> {t("contact.join")}

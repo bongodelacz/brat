@@ -15,7 +15,7 @@ export default function Footer() {
               <span className="font-display text-2xl font-bold">BRAT<span className="text-white/40">CLIENT</span></span>
             </div>
             <p className="label-mono mt-4">{t("footer.tag")}</p>
-            <a href="https://discord.gg/bratclient" target="_blank" rel="noreferrer" data-testid="footer-discord-btn"
+            <a href="https://discord.gg/brat" target="_blank" rel="noreferrer" data-testid="footer-discord-btn"
               className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 font-mono2 text-xs font-bold uppercase tracking-widest text-black transition-colors hover:bg-white/70">
               <MessageCircle size={14} /> {t("footer.discord")}
             </a>
@@ -38,7 +38,7 @@ export default function Footer() {
           <div>
             <p className="label-mono mb-4">{t("footer.communityTitle")}</p>
             <div className="flex flex-col gap-3">
-              <a href="https://discord.gg/bratclient" target="_blank" rel="noreferrer" data-testid="footer-link-discord" className={linkCls}>{t("footer.discord")}</a>
+              <a href="https://discord.gg/brat" target="_blank" rel="noreferrer" data-testid="footer-link-discord" className={linkCls}>{t("footer.discord")}</a>
             </div>
           </div>
         </div>
