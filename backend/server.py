@@ -1070,9 +1070,18 @@ UNLOCK_SECRET = os.environ.get("CLIENT_UNLOCK_SECRET") or os.environ.get("CLIENT
 
 
 def make_unlock_key(user_id: str, hwid: str, license_key: str, plan: str) -> str:
-    """Deterministyczny, per-user + per-maszyna klucz odblokowujący (hex 64).
-    Client NIE potrafi go policzyć sam (nie zna UNLOCK_SECRET) -> musi go dostać z serwera."""
+    """Deterministyczny, per-user + per-maszyna klucz (hex 64). Do bindowania/logów.
+    Client NIE potrafi go policzyć sam (nie zna UNLOCK_SECRET)."""
     msg = f"{user_id}.{hwid}.{license_key}.{plan}".encode()
+    return hmac.new(UNLOCK_SECRET.encode(), msg, hashlib.sha256).hexdigest()
+
+
+def make_content_key(build_version: str) -> str:
+    """Klucz deszyfrujący WSPÓLNY blob zaszyfrowany przy buildzie jara.
+    Taki sam dla wszystkich z ważną licencją (bo jar jest jeden), ale wydawany
+    TYLKO gdy valid==true (aktywna licencja). Zależny od wersji builda -> nowy
+    build = nowy klucz. Client szyfruje blob TYM KLUCZEM przy budowaniu jara."""
+    msg = f"content.{build_version}".encode()
     return hmac.new(UNLOCK_SECRET.encode(), msg, hashlib.sha256).hexdigest()
 
 
@@ -1163,6 +1172,7 @@ async def client_auth(ctx=Depends(verify_client_request)):
         "update_mandatory": build.get("mandatory", True),
         "build_available": bool(build) and not build.get("blocked"),
         "unlock_key": make_unlock_key(u["id"], hwid, lic["key"], lic["plan"]),
+        "content_key": make_content_key(server_version),
     }
 
 
@@ -1197,7 +1207,8 @@ async def client_heartbeat(ctx=Depends(verify_client_request)):
             "expires_at": lic.get("expires_at"), "tester": u.get("tester", False),
             "latest_version": build.get("version") or "1.0.0",
             "update_mandatory": build.get("mandatory", True),
-            "unlock_key": make_unlock_key(u["id"], sess["hwid"], lic["key"], lic["plan"])}
+            "unlock_key": make_unlock_key(u["id"], sess["hwid"], lic["key"], lic["plan"]),
+            "content_key": make_content_key(build.get("version") or "1.0.0")}
 
 
 @api.post("/client/logout")
@@ -1594,9 +1605,13 @@ async def admin_client_logs(_=Depends(require_admin)):
 
 @api.get("/admin/client/credentials")
 async def admin_client_credentials(_=Depends(require_admin)):
+    build = await active_build()
+    version = build.get("version") or "1.0.0"
     return {"api_key": os.environ["CLIENT_API_KEY"],
             "api_secret": os.environ["CLIENT_API_SECRET"],
-            "base_url": os.environ.get("PUBLIC_APP_URL", "") or ""}
+            "base_url": os.environ.get("PUBLIC_APP_URL", "") or "",
+            "content_key": make_content_key(version),
+            "content_key_version": version}
 
 
 @api.get("/admin/builds")
