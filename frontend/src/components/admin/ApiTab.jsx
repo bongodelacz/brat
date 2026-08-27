@@ -108,6 +108,8 @@ export default function ApiTab() {
           <Row label={t("admin.api.baseUrl")} value={BASE} testId="api-base-url" />
           <Row label={t("admin.api.key")} value={creds?.api_key} testId="api-key" />
           <Row label={t("admin.api.secret")} value={creds?.api_secret} secret testId="api-secret" />
+          <Row label={`CONTENT KEY${creds?.content_key_version ? ` (v${creds.content_key_version})` : ""}`}
+            value={creds?.content_key} secret testId="api-content-key" />
         </div>
       </div>
 
