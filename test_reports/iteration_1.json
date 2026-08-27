@@ -1,0 +1,39 @@
+{
+  "summary": "Frontend-only E2E testing (Playwright, public preview URL) of BratClient: admin login + all 7 admin tabs, coupons CRUD (percent + fixed, toggle, delete via confirm modal), landing coupon apply/remove + discounted prices, purchase of 30d plan with coupon, addon 'HWID Reset' purchase, user panel Orders tab, admin Orders tab (columns, search, 5 status filters, status change, delete), client version management, API tab (key/secret masking/reveal/log table), Users tab HWID row + Reset HWID, user Download tab HWID card, and rebrand check (no 'VQT' in UI). ~95% of flows pass. 2 real defects found: (a) version form state gets overwritten by late-resolving GET /build/info so a quickly-typed version is silently saved as the OLD value while a success toast shows; (b) user panel order statuses are hardcoded English in a Polish UI.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "admin/BuildTab.jsx", "issue": "Race condition: load() from useEffect (fires twice under React StrictMode) resets the controlled ver.version state after the user has typed. Reproduced: open 'Plik i wersja', type 2.0.0 immediately, click Zapisz wersję -> toast 'Wersja zapisana' shows but POST /api/admin/version sends the OLD version (1.2.3) and badge/DB stay 1.2.3. With a 4s wait before typing the save works (2.0.0 persisted after reload). Fix: only prefill form once (guard with a ref / 'dirty' flag) or don't overwrite user input on refetch.", "selector": "[data-testid=\"version-input\"], [data-testid=\"version-save\"]", "priority": "MEDIUM"},
+      {"component": "dashboard/PaymentsTab.jsx", "issue": "STATUS_LBL = {pending:'pending', completed:'completed', ...} is an identity map, so user panel order history shows English 'COMPLETED'/'REFUNDED' in the Polish UI, while admin uses translated labels (admin.orders.st.*). Use i18n keys instead.", "selector": "[data-testid=\"orders-table\"] td:nth-child(6)", "priority": "MEDIUM"},
+      {"component": "AuthContext / lib/api.js", "issue": "GET /api/auth/me is called on public pages without a stored token, producing repeated 401 'Failed to load resource' console errors (8+ per session) on /, /kontakt, /auth. Skip the call when localStorage token is absent.", "selector": "n/a", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Admin -> Zamówienia", "issues": ["Status column uses a native <input>/<select> element (browser default dropdown arrow + OS popup) instead of the shadcn Select used elsewhere — inconsistent with the black/white design system"]},
+      {"screen": "Admin -> Zamówienia / user Zamówienia", "issues": ["Order product names are stored in the request language, so historical rows mix languages ('Licencja 30 dni' vs 'Licencja 30 days'). Consider storing an item_id and translating at render time."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix BuildTab version form race: do not overwrite user-typed version when /build/info resolves (prefill once / dirty guard).",
+    "Translate user panel order statuses (PaymentsTab STATUS_LBL) via i18n instead of hardcoded English.",
+    "Avoid calling /api/auth/me without a token to remove 401 console noise on public pages.",
+    "Optional: replace native select in OrdersTab status column with shadcn Select; store translatable item id for order names."
+  ],
+  "critical_code_review_comments": [
+    "BuildTab.jsx line 17-21: load() sets both info and form state; combined with StrictMode double-invoke this makes the form non-deterministic — split read-only display state from editable form state.",
+    "PaymentsTab.jsx line 5: dead i18n map (identity), status text not localized.",
+    "Pricing.jsx discounted(): percent math `Math.round(price * coupon.value) / 100` rounds before dividing — fine for integer prices but will misround for fractional prices/values; prefer Math.round(price*value)/100 on the final amount consistently."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "not tested (per request)", "frontend": "92%"},
+  "seed_data_creation": "Created coupons QA20 (percent 20, max 5) and QA10FIX (fixed 10) — both deleted after testing. Created demo orders for demo@bratclient.gg (30d with QA20 = 40 PLN, HWID Reset = 20 PLN); one addon order (BRAT-43529FDE) was set to refunded and then deleted during admin order tests. Client version left at 2.0.0.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "Admin alexwitom / lobaczus2009; user demo@bratclient.gg / demo12345 (both work)",
+  "context_for_next_testing_agent": "All 7 admin tabs render clean (no page errors). Coupons create/toggle/delete, orders search/filters/status/delete, api-secret reveal (5 client log rows present), hwid reset toast, landing coupon 50->40 / 80->64 / 100->80 with strikethrough, plan + addon purchase -> user orders — all verified working. Only open items: BuildTab version-input race, English order statuses in user panel, 401 console noise. Rebrand verified: grep of frontend/src finds 'vqt' only in localStorage keys (vqt_token, vqt_lang) — no user-visible VQT text; note existing admin account email is still admin@vqt.gg (data, not UI).",
+  "rca_of_the_issue": "BuildTab keeps the editable version form inside the same state that its fetch callback overwrites. Under React StrictMode useEffect runs twice, so a second /api/build/info response lands after the user typed and resets `ver.version` to the server value; the subsequent submit then POSTs the stale value while still showing the success toast — giving the impression the version save is broken."
+}

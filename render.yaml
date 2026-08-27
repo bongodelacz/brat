@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: bratclient-api
+    runtime: python
+    rootDir: backend
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_BUILD_BUCKET
+        value: builds
+      - key: JWT_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: CLIENT_API_KEY
+        sync: false
+      - key: CLIENT_API_SECRET
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PUBLIC_APP_URL
+        sync: false
+      # --- Email (Resend) + 2FA ---
+      # Ustaw REQUIRE_ADMIN_2FA=false jeśli nie masz jeszcze RESEND_API_KEY,
+      # wtedy admin loguje się samym hasłem (bez kodu z maila).
+      - key: REQUIRE_ADMIN_2FA
+        value: "false"
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: "BratClient <onboarding@resend.dev>"
+      - key: EMAIL_FROM_NAME
+        value: BratClient

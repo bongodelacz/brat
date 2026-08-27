@@ -1,0 +1,100 @@
+{
+  "project_name": "Vqt Client",
+  "app_type": "hybrid_fullstack",
+  "theme": "dark",
+  "design_philosophy": "Awwwards-level Brutalist Gaming. Structural honesty, high-contrast typography, and purposeful negative space. NO GRADIENTS. Elite, authoritative, non-AI aesthetic.",
+  "colors": {
+    "background": "#050505",
+    "foreground": "#FFFFFF",
+    "primary": "#2742F5",
+    "primary_foreground": "#FFFFFF",
+    "card": "#0A0A0A",
+    "muted": "#141414",
+    "border": "rgba(255, 255, 255, 0.1)",
+    "rules": [
+      "CRITICAL: NO GRADIENTS ANYWHERE. Do not use bg-gradient, text-gradient, or soft glowing blurs.",
+      "Use #050505 for main backgrounds (the 'void').",
+      "Use #2742F5 for CTAs, active states, and structural accents.",
+      "Use #FFFFFF for all primary text.",
+      "Use rgba(255, 255, 255, 0.1) for 1px hairline borders to separate layout grids."
+    ]
+  },
+  "typography": {
+    "headings": "Clash Display, Unbounded, or Bebas Neue",
+    "body": "Manrope or Inter",
+    "mono": "JetBrains Mono or Space Mono (For UID, numbers, stats, and small labels)",
+    "hierarchy": {
+      "h1": "text-5xl md:text-6xl font-black tracking-tighter leading-none uppercase",
+      "h2": "text-3xl md:text-5xl font-bold tracking-tight uppercase",
+      "h3": "text-xl md:text-2xl font-bold",
+      "body": "text-base leading-relaxed text-white/80",
+      "labels": "font-mono text-xs uppercase tracking-[0.2em] text-white/50"
+    }
+  },
+  "visual_enhancers": {
+    "borders": "1px solid border-white/10. Grid-like layouts (Swiss brutalist pattern).",
+    "corners": "Sharp edges. Use rounded-none or maximum rounded-sm.",
+    "shadows": "DO NOT USE soft shadows. Use hard 1px borders or solid drop-shadow offsets (e.g. 4px 4px 0px #2742F5).",
+    "glassmorphism": "Avoid standard muddy glass. If needed, use extremely subtle bg-black/60 with backdrop-blur-xl and 1px hard border-white/10."
+  },
+  "layouts": {
+    "marketing_landing": {
+      "hero": "Kinetic hero section with masked line-by-line reveal text. High contrast, large bold statements. Include abstract 3D cube or geometric graphics.",
+      "manifesto": "Numbered chapters (01, 02, 03). Huge typography on left, text on right. Use Framer-motion scroll-reveals (fade up + subtle parallax).",
+      "marquee": "Slow editorial marquee. font-mono. Text like 'VQT CLIENT • HIGH PERFORMANCE • UNDETECTED • '",
+      "shop": "3-column grid for licenses (30 dni, 90 dni, lifetime). Highlight the lifetime plan with the #2742F5 accent color."
+    },
+    "dashboard": {
+      "structure": "Grid/Bento layout. High density but with generous padding inside cards (p-6 or p-8).",
+      "tabs": [
+        "Language: Switcher for PL/EN",
+        "Profile: Avatar, Name, UID, About me",
+        "Account & Security: Email, Password change, Discord connect button, 2FA toggle",
+        "Payment History: Data table with simple, brutalist borders",
+        "Download: Big primary button with the file download link"
+      ]
+    }
+  },
+  "components": {
+    "buttons": "Rectangular, sharp edges (rounded-none). Hard hover states (e.g. hover:bg-white hover:text-black) instead of soft fades. Primary CTA must use #2742F5.",
+    "inputs": "Flat bg (#0A0A0A), sharp corners, 1px border-white/10. Focus state: border-[#2742F5].",
+    "cards": "Flat background. No soft shadows. Rely on 1px borders for definition.",
+    "navigation": "Sticky top bar, z-50, dark glassmorphism (bg-[#050505]/80 backdrop-blur-xl). Must have Logo, Shop, Login/Dashboard links, and Language switch."
+  },
+  "motion": {
+    "scroll": "Use Lenis for smooth scrolling. Momentum and weight are critical for premium feel.",
+    "reveals": "Staggered text reveals (framer-motion). Elements should translate from Y offset with 0 opacity to full opacity on scroll.",
+    "hover": "Instant or very fast (150ms) state changes to feel responsive and 'hacker/gamer' like. No lazy slow hovers."
+  },
+  "media": {
+    "image_urls": {
+      "hero_abstract": {
+        "url": "https://images.pexels.com/photos/6727766/pexels-photo-6727766.jpeg",
+        "description": "Abstract geometric neon cubes for hero section visual"
+      },
+      "manifesto_graphic": {
+        "url": "https://images.pexels.com/photos/12707786/pexels-photo-12707786.jpeg",
+        "description": "Abstract blue tunnel for scroll-reveal sections"
+      },
+      "dashboard_mockup": {
+        "url": "https://images.unsplash.com/photo-1603481588273-2f908a9a7a1b",
+        "description": "Dark gaming setup to represent the elite client feel"
+      }
+    }
+  },
+  "content_requirements": {
+    "default_language": "PL",
+    "translations": "PL/EN switcher available",
+    "pricing_data": [
+      { "plan": "30 dni", "price": "50 zł" },
+      { "plan": "90 dni", "price": "80 zł" },
+      { "plan": "lifetime", "price": "100 zł" }
+    ]
+  },
+  "accessibility": {
+    "contrast": "Ensure #2742F5 and #FFFFFF pass APCA contrast against #050505.",
+    "testing": "All interactive elements (buttons, inputs, tabs) MUST include data-testid attributes."
+  },
+  "instructions_to_main_agent": "CRITICAL: You are building a Minecraft cheat client store and dashboard (Vqt). Use ONLY pure #050505, #FFFFFF, and #2742F5. NO GRADIENTS anywhere. Implement Framer Motion for scroll reveals and kinetic typography. Use standard HTML/Tailwind for the landing page (Bento grids, raw divs) and Shadcn for the Dashboard (Tables, Tabs, Forms) heavily customized to remove border-radius and soft shadows. Build the full routing: Landing -> Auth -> Dashboard.",
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": "1. Never use gradients. 2. Implement Lenis smooth scroll. 3. Use 2-3x more padding than usual (e.g., p-12, py-24). 4. Do not center-align everything; use strict grid-based optical alignment. 5. Include data-testid on all key interactive elements. 6. Make it feel premium, brutalist, and highly technical. 7. Do not use transparent backgrounds under text. 8. All mockups/graphics must be treated like high-end product photography."
+}
