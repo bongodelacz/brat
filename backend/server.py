@@ -1061,6 +1061,21 @@ def client_fail(code: str) -> dict:
     return {"valid": False, "code": code}
 
 
+# ---- server-side unlock (anti-crack) ----
+# Klucz odblokowujący jest wyprowadzany z sekretu, którego NIE MA w kliencie.
+# Bez aktywnej licencji serwer go nie wyda -> client pozostaje zaszyfrowany.
+# CLIENT_UNLOCK_SECRET trzymaj w .env (inny niż CLIENT_API_SECRET). Zmiana tego
+# sekretu na serwerze natychmiast unieważnia wszystkie istniejące cracki.
+UNLOCK_SECRET = os.environ.get("CLIENT_UNLOCK_SECRET") or os.environ.get("CLIENT_API_SECRET", "")
+
+
+def make_unlock_key(user_id: str, hwid: str, license_key: str, plan: str) -> str:
+    """Deterministyczny, per-user + per-maszyna klucz odblokowujący (hex 64).
+    Client NIE potrafi go policzyć sam (nie zna UNLOCK_SECRET) -> musi go dostać z serwera."""
+    msg = f"{user_id}.{hwid}.{license_key}.{plan}".encode()
+    return hmac.new(UNLOCK_SECRET.encode(), msg, hashlib.sha256).hexdigest()
+
+
 @api.post("/client/version")
 async def client_version(ctx=Depends(verify_client_request)):
     b = await active_build()
@@ -1147,6 +1162,7 @@ async def client_auth(ctx=Depends(verify_client_request)):
         "version_ok": (version == server_version) if version else None,
         "update_mandatory": build.get("mandatory", True),
         "build_available": bool(build) and not build.get("blocked"),
+        "unlock_key": make_unlock_key(u["id"], hwid, lic["key"], lic["plan"]),
     }
 
 
@@ -1180,7 +1196,8 @@ async def client_heartbeat(ctx=Depends(verify_client_request)):
     return {"valid": True, "code": "OK", "plan": lic["plan"],
             "expires_at": lic.get("expires_at"), "tester": u.get("tester", False),
             "latest_version": build.get("version") or "1.0.0",
-            "update_mandatory": build.get("mandatory", True)}
+            "update_mandatory": build.get("mandatory", True),
+            "unlock_key": make_unlock_key(u["id"], sess["hwid"], lic["key"], lic["plan"])}
 
 
 @api.post("/client/logout")

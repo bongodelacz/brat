@@ -28,6 +28,8 @@ services:
         sync: false
       - key: CLIENT_API_SECRET
         sync: false
+      - key: CLIENT_UNLOCK_SECRET
+        generateValue: true
       - key: CORS_ORIGINS
         sync: false
       - key: PUBLIC_APP_URL
