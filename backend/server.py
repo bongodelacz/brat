@@ -324,7 +324,8 @@ class CouponPatch(BaseModel):
 
 class GrantIn(BaseModel):
     plan: str | None = None
-    days: int | None = Field(default=None, ge=1, le=3650)
+    days: int | None = Field(default=None, ge=1, le=3650)          # zostawione dla kompatybilności
+    duration: str | None = Field(default=None, max_length=20)      # np. "30min", "1d", "1m", "1y"
 
 
 class TrackIn(BaseModel):
@@ -379,13 +380,35 @@ def public_config(c: dict, include_settings: bool = False) -> dict:
 
 # ---------------------------------------------------------------- shop logic
 
-def new_license(user_id: str, plan_id: str, custom_days: int | None = None) -> dict:
+def parse_duration(s: str) -> int | None:
+    """Zamienia '30min','1d','1m','1y','2h' na liczbę MINUT. None jeśli błąd.
+    Jednostki: min=minuta, h=godzina, d=dzień, w=tydzień, m=miesiąc(30d), y=rok(365d)."""
+    import re as _re
+    if not s:
+        return None
+    s = s.strip().lower().replace(" ", "")
+    match = _re.fullmatch(r"(\d+)(min|h|d|w|m|y)", s)
+    if not match:
+        return None
+    n = int(match.group(1))
+    unit = match.group(2)
+    per = {"min": 1, "h": 60, "d": 1440, "w": 10080, "m": 43200, "y": 525600}[unit]
+    total = n * per
+    if total < 1 or total > 525600 * 10:  # max 10 lat
+        return None
+    return total
+
+
+def new_license(user_id: str, plan_id: str, custom_minutes: int | None = None,
+                label: str | None = None) -> dict:
     now = datetime.now(timezone.utc)
     key = "BRAT-" + "-".join(secrets.token_hex(2).upper() for _ in range(3))
     if plan_id == "custom":
-        return {"user_id": user_id, "plan": "custom", "days": custom_days, "key": key,
+        return {"user_id": user_id, "plan": "custom",
+                "days": int(custom_minutes // 1440) if custom_minutes else 0,
+                "duration_label": label, "key": key,
                 "price_pln": 0, "created_at": now.isoformat(),
-                "expires_at": (now + timedelta(days=custom_days)).isoformat(),
+                "expires_at": (now + timedelta(minutes=custom_minutes)).isoformat(),
                 "status": "active"}
     plan = PLANS[plan_id]
     return {"user_id": user_id, "plan": plan_id, "days": plan["days"], "key": key,
@@ -1439,16 +1462,34 @@ async def admin_grant_license(user_id: str, body: GrantIn, request: Request, adm
     u = await get_user_by_id(user_id)
     if not u:
         raise HTTPException(404, "User not found")
-    if body.days:
-        lic = new_license(user_id, "custom", body.days)
+    if body.duration:
+        minutes = parse_duration(body.duration)
+        if not minutes:
+            raise HTTPException(400, "Zły format czasu. Użyj np. 30min, 2h, 1d, 1w, 1m, 1y")
+        lic = new_license(user_id, "custom", minutes, label=body.duration.strip().lower())
+    elif body.days:
+        lic = new_license(user_id, "custom", body.days * 1440, label=f"{body.days}d")
     elif body.plan and body.plan in PLANS:
         lic = new_license(user_id, body.plan)
     else:
-        raise HTTPException(400, "plan or days required")
+        raise HTTPException(400, "plan, days or duration required")
     res = await client.table("licenses").insert(lic).execute()
     await log_admin(admin, "grant_license", request, u["username"],
-                    {"plan": lic["plan"], "days": lic.get("days")})
+                    {"plan": lic["plan"], "duration": body.duration or (f"{body.days}d" if body.days else lic["plan"])})
     return res.data[0]
+
+
+@api.delete("/admin/licenses/{license_id}")
+async def admin_delete_license(license_id: str, request: Request, admin=Depends(require_admin)):
+    client = await sb()
+    lic = await one(client.table("licenses").select("*").eq("id", license_id))
+    if not lic:
+        raise HTTPException(404, "License not found")
+    await client.table("licenses").delete().eq("id", license_id).execute()
+    # usunięcie licencji unieważnia sesje w grze (heartbeat zwróci LICENSE_EXPIRED)
+    await client.table("client_sessions").delete().eq("user_id", lic["user_id"]).execute()
+    await log_admin(admin, "delete_license", request, lic.get("key"), {"plan": lic.get("plan")})
+    return {"ok": True}
 
 
 @api.post("/admin/users/{user_id}/hwid/reset")

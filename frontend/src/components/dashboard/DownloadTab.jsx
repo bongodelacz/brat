@@ -5,6 +5,7 @@ import { Download, RefreshCcw, Cpu, Ban, X } from "lucide-react";
 import { useLang } from "@/i18n";
 import { useAuth } from "@/context/AuthContext";
 import api, { errMsg } from "@/lib/api";
+import ConfirmModal from "@/components/ConfirmModal";
 
 export default function DownloadTab() {
   const { t } = useLang();
@@ -14,6 +15,7 @@ export default function DownloadTab() {
   const [busy, setBusy] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
     api.get("/licenses/my").then(({ data }) => setLicense(data.find((l) => l.status === "active") || null)).catch(() => setLicense(null));
@@ -107,7 +109,7 @@ export default function DownloadTab() {
               )}
             </div>
           </div>
-          <button data-testid="hwid-reset-btn" onClick={resetHwid} disabled={!canReset || resetting}
+          <button data-testid="hwid-reset-btn" onClick={() => setConfirmReset(true)} disabled={!canReset || resetting}
             className="flex items-center gap-3 rounded-full bg-white px-8 py-4 font-mono2 text-sm font-bold uppercase tracking-widest text-black transition-colors hover:bg-white/70 disabled:cursor-not-allowed disabled:opacity-30">
             <RefreshCcw size={15} className={resetting ? "animate-spin" : ""} />
             {resetting ? t("dash.download.resetting") : t("dash.download.reset")}
@@ -143,6 +145,11 @@ export default function DownloadTab() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmModal testId="hwid-reset-confirm" open={confirmReset}
+        title={t("dash.download.resetConfirmTitle")} desc={t("dash.download.resetConfirmDesc")}
+        onCancel={() => setConfirmReset(false)}
+        onConfirm={() => { setConfirmReset(false); resetHwid(); }} />
     </div>
   );
 }

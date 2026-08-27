@@ -64,10 +64,10 @@ export default function BuildsTab() {
                 onChange={(e) => setForm({ ...form, notes: e.target.value })} className={`${inputCls} resize-none`} />
             </div>
             <button type="button" data-testid="build-mandatory-toggle" onClick={() => setForm({ ...form, mandatory: !form.mandatory })}
-              className="flex w-full items-center justify-between rounded-2xl border border-white/15 px-5 py-4 text-left transition-colors hover:border-white/40">
+              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/15 px-5 py-4 text-left transition-colors hover:border-white/40">
               <span className="font-mono2 text-xs text-white/70">{t("admin.build.mandatory")}</span>
-              <span className={`flex h-6 w-11 items-center rounded-full p-1 transition-colors ${form.mandatory ? "bg-white" : "bg-white/15"}`}>
-                <span className={`h-4 w-4 rounded-full transition-transform ${form.mandatory ? "translate-x-5 bg-black" : "bg-white/60"}`} />
+              <span className={`relative flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${form.mandatory ? "bg-white" : "bg-white/15"}`}>
+                <span className={`absolute h-4 w-4 rounded-full transition-all ${form.mandatory ? "left-6 bg-black" : "left-1 bg-white/60"}`} />
               </span>
             </button>
           </div>

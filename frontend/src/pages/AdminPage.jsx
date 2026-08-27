@@ -52,7 +52,7 @@ function Overview() {
 function UsersTab() {
   const { t } = useLang();
   const [users, setUsers] = useState(null);
-  const [days, setDays] = useState({});
+  const [dur, setDur] = useState({});
   const [modal, setModal] = useState(null);
   const load = () => api.get("/admin/users").then(({ data }) => setUsers(data)).catch((e) => toast.error(errMsg(e)));
   useEffect(() => { load(); }, []);
@@ -62,13 +62,9 @@ function UsersTab() {
     catch (e) { toast.error(errMsg(e)); }
   };
   const grantCustom = async (id) => {
-    const d = parseInt(days[id], 10);
-    if (!d || d < 1) return;
-    try { await api.post(`/admin/users/${id}/license`, { days: d }); toast.success(t("admin.users.granted")); setDays({ ...days, [id]: "" }); load(); }
-    catch (e) { toast.error(errMsg(e)); }
-  };
-  const resetHwid = async (id) => {
-    try { await api.post(`/admin/users/${id}/hwid/reset`); toast.success(t("admin.users.hwidResetOk")); load(); }
+    const d = (dur[id] || "").trim();
+    if (!d) return;
+    try { await api.post(`/admin/users/${id}/license`, { duration: d }); toast.success(t("admin.users.granted")); setDur({ ...dur, [id]: "" }); load(); }
     catch (e) { toast.error(errMsg(e)); }
   };
 
@@ -95,12 +91,28 @@ function UsersTab() {
                 <span className={`rounded-full px-2.5 py-1 ${u.blocked ? "bg-white text-black" : "border border-white/15 text-white/60"}`} data-testid={`admin-user-status-${u.uid}`}>
                   {u.blocked ? t("admin.users.blocked") : t("admin.users.active")}
                 </span>
-                <span className="text-white/40">{t("admin.users.licenses")}: {u.licenses.length === 0 ? t("admin.users.none") : u.licenses.map((l) => planName(l.plan, t, l.days)).join(", ")}</span>
                 <span className="text-white/30">{t("admin.users.joined")}: {u.created_at ? new Date(u.created_at).toLocaleDateString() : "-"}</span>
               </div>
               <p className="mt-2 flex items-center gap-2 font-mono2 text-[10px] uppercase tracking-widest text-white/40" data-testid={`admin-user-hwid-${u.uid}`}>
                 <Cpu size={11} /> {t("admin.users.hwid")}: {u.hwid_bound && u.hwid ? u.hwid : t("admin.users.hwidNone")}
               </p>
+              {/* Lista licencji z możliwością usunięcia */}
+              <div className="mt-3 flex flex-col gap-1.5" data-testid={`admin-user-licenses-${u.uid}`}>
+                {u.licenses.length === 0 ? (
+                  <span className="font-mono2 text-[10px] uppercase tracking-widest text-white/30">{t("admin.users.licenses")}: {t("admin.users.none")}</span>
+                ) : u.licenses.map((l) => (
+                  <div key={l.id} className="flex items-center gap-2 font-mono2 text-[10px] uppercase tracking-widest">
+                    <span className="rounded-full border border-white/15 px-2.5 py-1 text-white/70">
+                      {l.duration_label || planName(l.plan, t, l.days)}
+                    </span>
+                    <span className="text-white/30">{l.status}{l.expires_at ? ` · do ${new Date(l.expires_at).toLocaleString()}` : ""}</span>
+                    <button data-testid={`license-delete-${l.id}`} onClick={() => setModal({ type: "license", user: u, license: l })}
+                      className="rounded-full border border-white/15 px-2 py-1 text-white/50 transition-colors hover:border-white hover:bg-white hover:text-black">
+                      <Trash2 size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
             {u.role !== "admin" && (
               <div className="flex flex-col items-end gap-2">
@@ -112,7 +124,7 @@ function UsersTab() {
                       <KeyRound size={10} className="mr-1 inline" />{p}
                     </button>
                   ))}
-                  <button data-testid={`hwid-reset-${u.uid}`} onClick={() => resetHwid(u.id)} className={btn}>
+                  <button data-testid={`hwid-reset-${u.uid}`} onClick={() => setModal({ type: "hwid", user: u })} className={btn}>
                     <Cpu size={10} className="mr-1 inline" />{t("admin.users.hwidReset")}
                   </button>
                   <button data-testid={`block-${u.uid}`} onClick={() => setModal({ type: "block", user: u })} className={btn}>
@@ -124,23 +136,33 @@ function UsersTab() {
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="label-mono">{t("admin.users.customDays")}</span>
-                  <input data-testid={`custom-days-${u.uid}`} type="number" min="1" max="3650" value={days[u.id] || ""}
-                    onChange={(e) => setDays({ ...days, [u.id]: e.target.value })}
-                    className="w-20 rounded-full border border-white/15 bg-black px-3 py-1 font-mono2 text-[11px] outline-none focus:border-white/60" placeholder="45" />
+                  <span className="label-mono">{t("admin.users.customDur")}</span>
+                  <input data-testid={`custom-dur-${u.uid}`} type="text" value={dur[u.id] || ""}
+                    onChange={(e) => setDur({ ...dur, [u.id]: e.target.value })}
+                    onKeyDown={(e) => e.key === "Enter" && grantCustom(u.id)}
+                    className="w-24 rounded-full border border-white/15 bg-black px-3 py-1 font-mono2 text-[11px] outline-none focus:border-white/60" placeholder="30min / 1d / 1m" />
                   <button data-testid={`grant-custom-${u.uid}`} onClick={() => grantCustom(u.id)}
                     className="rounded-full border border-white px-3 py-1 font-mono2 text-[10px] font-bold uppercase tracking-widest text-white transition-colors hover:bg-white hover:text-black">
                     {t("admin.users.grantBtn")}
                   </button>
                 </div>
+                <p className="font-mono2 text-[9px] uppercase tracking-widest text-white/25">min · h · d · w · m · y</p>
               </div>
             )}
           </div>
         </div>
       ))}
       <ConfirmModal testId="admin-confirm" open={!!modal}
-        title={modal?.type === "delete" ? t("admin.users.confirmDeleteTitle") : t("admin.users.confirmBlockTitle")}
-        desc={modal?.type === "delete" ? t("admin.users.confirmDelete") : t("admin.users.confirmBlock")}
+        title={
+          modal?.type === "delete" ? t("admin.users.confirmDeleteTitle")
+          : modal?.type === "license" ? t("admin.users.confirmLicenseTitle")
+          : modal?.type === "hwid" ? t("admin.users.confirmHwidTitle")
+          : t("admin.users.confirmBlockTitle")}
+        desc={
+          modal?.type === "delete" ? t("admin.users.confirmDelete")
+          : modal?.type === "license" ? t("admin.users.confirmLicense")
+          : modal?.type === "hwid" ? t("admin.users.confirmHwid")
+          : t("admin.users.confirmBlock")}
         onCancel={() => setModal(null)}
         onConfirm={async () => {
           const m = modal;
@@ -148,6 +170,8 @@ function UsersTab() {
           if (!m) return;
           try {
             if (m.type === "delete") { await api.delete(`/admin/users/${m.user.id}`); toast.success(t("admin.users.deleted")); }
+            else if (m.type === "license") { await api.delete(`/admin/licenses/${m.license.id}`); toast.success(t("admin.users.licenseDeleted")); }
+            else if (m.type === "hwid") { await api.post(`/admin/users/${m.user.id}/hwid/reset`); toast.success(t("admin.users.hwidResetOk")); }
             else { await api.post(`/admin/users/${m.user.id}/block`); toast.success(t("admin.users.statusOk")); }
             load();
           } catch (e) { toast.error(errMsg(e)); }
