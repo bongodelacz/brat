@@ -61,6 +61,9 @@ export default function TwoFactorPanel({ emailHint, onSubmit, onCancel, loading,
         <p className="mt-2 text-sm text-white/50">
           {t("auth.tfaSub")} <span className="font-mono2 text-white">{emailHint}</span>
         </p>
+        <p className="mt-3 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 font-mono2 text-[11px] leading-relaxed text-white/40">
+          {t("auth.tfaSpam")}
+        </p>
       </div>
       <CodeInput value={code} onChange={setCode} disabled={loading} testId="twofa-code" />
       {error && <p className="font-mono2 text-xs text-white" data-testid="twofa-error">{error}</p>}

@@ -160,6 +160,9 @@ export default function SecurityTab() {
               <p className="mt-2 text-sm text-white/50">
                 {t("auth.tfaSub")} <span className="font-mono2 text-white">{challenge.email_hint}</span>
               </p>
+              <p className="mt-3 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 font-mono2 text-[11px] leading-relaxed text-white/40">
+                {t("auth.tfaSpam")}
+              </p>
               <div className="mt-6">
                 <CodeInput value={code} onChange={(v) => { setCode(v); if (v.length === 6) confirmCode(v); }}
                   disabled={busy} testId="tfa-setup-code" />
