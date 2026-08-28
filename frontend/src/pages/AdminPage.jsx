@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { LayoutGrid, Users, Eye, LogOut, Ban, Trash2, Undo2, KeyRound, Package, Receipt, Ticket, Plug, Cpu } from "lucide-react";
+import { LayoutGrid, Users, Eye, LogOut, Ban, Trash2, Undo2, KeyRound, Package, Receipt, Ticket, Plug, Cpu, Unlock } from "lucide-react";
 import { useLang } from "@/i18n";
 import { useAuth } from "@/context/AuthContext";
 import api, { errMsg } from "@/lib/api";
@@ -12,6 +12,7 @@ import CouponsTab from "@/components/admin/CouponsTab";
 import BuildsTab from "@/components/admin/BuildsTab";
 import AnalyticsPanel from "@/components/admin/AnalyticsPanel";
 import ApiTab from "@/components/admin/ApiTab";
+import UnlocksTab from "@/components/admin/UnlocksTab";
 
 const TABS = [
   { id: "overview", icon: LayoutGrid, key: "admin.tabs.overview" },
@@ -19,6 +20,7 @@ const TABS = [
   { id: "orders", icon: Receipt, key: "admin.tabs.orders" },
   { id: "coupons", icon: Ticket, key: "admin.tabs.coupons" },
   { id: "visits", icon: Eye, key: "admin.tabs.visits" },
+  { id: "unlocks", icon: Unlock, key: "admin.tabs.unlocks" },
   { id: "build", icon: Package, key: "admin.tabs.build" },
   { id: "api", icon: Plug, key: "admin.tabs.api" },
 ];
@@ -297,6 +299,7 @@ export default function AdminPage() {
           {tab === "orders" && <OrdersTab />}
           {tab === "coupons" && <CouponsTab />}
           {tab === "visits" && <VisitsTab />}
+          {tab === "unlocks" && <UnlocksTab />}
           {tab === "build" && <BuildsTab />}
           {tab === "api" && <ApiTab />}
         </motion.div>

@@ -90,3 +90,6 @@ credentials.json
 # ale zachowaj przykłady konfiguracji
 !.env.example
 !**/.env.example
+# .env.production nie zawiera sekretów — tylko flagi buildu (np. GENERATE_SOURCEMAP)
+!.env.production
+!**/.env.production

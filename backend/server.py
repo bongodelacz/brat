@@ -653,6 +653,8 @@ async def plans():
 
 @api.post("/track")
 async def track(body: TrackIn, request: Request):
+    # publiczny, więc limit per IP, żeby nie dało się zalać tabeli visits
+    await rate_limit(request, "track", 120, 60)
     client = await sb()
     await client.table("visits").insert({
         "ip": client_ip(request), "path": body.path, "ts": now_iso()}).execute()
@@ -1080,6 +1082,28 @@ async def log_client(ip: str, result: str, hwid: str | None = None,
         "version": version, "user_id": user_id, "ts": now_iso()}).execute()
 
 
+def _mask(v: str | None, keep: int = 4) -> str:
+    if not v:
+        return "—"
+    if len(v) <= keep * 2:
+        return v[0] + "*" * (len(v) - 1)
+    return v[:keep] + "*" * (len(v) - keep * 2) + v[-keep:]
+
+
+async def log_unlock(u: dict, lic: dict, hwid: str, ip: str,
+                     version: str | None, first_bound: bool):
+    """Loguje WYDANIE kluczy (bez samych kluczy!) do monitoringu admina."""
+    client = await sb()
+    try:
+        await client.table("unlock_logs").insert({
+            "user_id": u["id"], "username": u.get("username"), "uid": u.get("uid"),
+            "license_key": _mask(lic.get("key")), "plan": lic.get("plan"),
+            "hwid": _mask(hwid), "ip": ip, "version": version,
+            "first_bound": first_bound, "ts": now_iso()}).execute()
+    except Exception as e:
+        logger.warning("unlock log failed: %s", e)
+
+
 def client_fail(code: str) -> dict:
     return {"valid": False, "code": code}
 
@@ -1183,6 +1207,7 @@ async def client_auth(ctx=Depends(verify_client_request)):
         "token": session_token, "user_id": u["id"], "hwid": hwid, "ip": ip,
         "version": version, "created_at": now_iso()}).execute()
     await log_client(ip, "OK", hwid, identifier or license_key, version, u["id"])
+    await log_unlock(u, lic, hwid, ip, version, hwid_bound_now)
     return {
         "valid": True, "code": "OK",
         "username": u["username"], "uid": u.get("uid"), "email": u["email"],
@@ -1642,6 +1667,32 @@ async def admin_action_logs(_=Depends(require_admin)):
 async def admin_client_logs(_=Depends(require_admin)):
     client = await sb()
     return await rows(client.table("client_logs").select("*").order("ts", desc=True).limit(200))
+
+
+@api.get("/admin/unlock/logs")
+async def admin_unlock_logs(_=Depends(require_admin), limit: int = 200):
+    client = await sb()
+    limit = max(1, min(limit, 1000))
+    return await rows(client.table("unlock_logs").select("*").order("ts", desc=True).limit(limit))
+
+
+@api.get("/admin/unlock/stats")
+async def admin_unlock_stats(_=Depends(require_admin)):
+    """Agregat dla ładnej karty monitoringu: unikliki dziś / 7d / unikalne maszyny."""
+    client = await sb()
+    now = datetime.now(timezone.utc)
+    day = (now - timedelta(days=1)).isoformat()
+    week = (now - timedelta(days=7)).isoformat()
+    res_day = await client.table("unlock_logs").select("id", count="exact").gt("ts", day).limit(1).execute()
+    res_week = await client.table("unlock_logs").select("id", count="exact").gt("ts", week).limit(1).execute()
+    res_total = await client.table("unlock_logs").select("id", count="exact").limit(1).execute()
+    unique_hwids = await rows(client.table("unlock_logs").select("hwid").gt("ts", week))
+    return {
+        "today": res_day.count or 0,
+        "week": res_week.count or 0,
+        "total": res_total.count or 0,
+        "unique_machines_week": len({r["hwid"] for r in unique_hwids}),
+    }
 
 
 @api.get("/admin/client/credentials")
